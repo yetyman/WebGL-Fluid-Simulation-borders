@@ -1646,7 +1646,9 @@ var x = 0;
 var y = 0;
 var i = 0;
 var max = 1000000
-setInterval(()->{
+setInterval(myfunc1, 30);
+
+function myfunc1(){
     i++;
     if(i > max) i = 0;
     
@@ -1666,8 +1668,7 @@ setInterval(()->{
     }
 
     updatePointerMoveData(pointers[0], x, y);
-}, 30)
-
+}
 function updatePointerMoveDataFake (pointer, posXPer, posYPer) {
     pointer.prevTexcoordX = pointer.texcoordX;
     pointer.prevTexcoordY = pointer.texcoordY;
