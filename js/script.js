@@ -1642,6 +1642,42 @@ function updatePointerMoveData (pointer, posX, posY) {
     pointer.moved = Math.abs(pointer.deltaX) > 0 || Math.abs(pointer.deltaY) > 0;
 }
 
+var x = 0;
+var y = 0;
+var i = 0;
+var max = 1000000
+setInterval(()->{
+    i++;
+    if(i > max) i = 0;
+    
+    //track along 0-1 x then 0-1 y then reverse each.
+    if(i < max/4){
+	y = 0;
+        x = i / (max/4);
+    }else if(i < max/2){
+        x = 1;
+	y = (i-max/4) / (max/4);   
+    }else if(i < max/4*3){
+        y = 1;
+	x = 1 - (i-max/2) / (max/4);
+    }else{
+	x = 0;
+        y = 1 - (i-max/4*3) / (max/4);
+    }
+
+    updatePointerMoveData(pointers[0], x, y);
+}, 30)
+
+function updatePointerMoveDataFake (pointer, posXPer, posYPer) {
+    pointer.prevTexcoordX = pointer.texcoordX;
+    pointer.prevTexcoordY = pointer.texcoordY;
+    pointer.texcoordX = posXPer;
+    pointer.texcoordY = 1.0 - posYPer;
+    pointer.deltaX = correctDeltaX(pointer.texcoordX - pointer.prevTexcoordX);
+    pointer.deltaY = correctDeltaY(pointer.texcoordY - pointer.prevTexcoordY);
+    pointer.moved = Math.abs(pointer.deltaX) > 0 || Math.abs(pointer.deltaY) > 0;
+}
+
 function updatePointerUpData (pointer) {
     pointer.down = false;
 }
