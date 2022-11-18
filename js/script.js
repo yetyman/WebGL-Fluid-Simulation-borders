@@ -54,9 +54,69 @@ let config = {
     SUNRAYS_RESOLUTION: 196,
     SUNRAYS_WEIGHT: 1.0,
     SOUND_SENSITIVITY: 0.25,
-    FREQ_RANGE: 40,
-    FREQ_MULTI:0.1,
+    FREQ_RANGE: 8,
 }
+function myfunc1(track){
+    if (track.start == null){
+        track.start = window.performance.now();
+        console.log("initializing myfunc1 pointer");
+        pointers.push(track.pointer);
+    }
+
+    if(track.start + track.max < window.performance.now()){
+        track.start += track.max;
+    } 
+
+    track.i = (window.performance.now() - track.start + track.offset)%track.max;
+    
+    //track along 0-1 x then 0-1 y then reverse each.
+    if(track.i < track.max/4){
+        track.y = 0;
+        track.x = track.i / (track.max/4);
+    }else if(track.i < track.max/2){
+        track.x = 1;
+        track.y = (track.i-track.max/4) / (track.max/4);   
+    }else if(track.i < track.max/4*3){
+        track.y = 1;
+        track.x = 1 - (track.i-track.max/2) / (track.max/4);
+    }else{
+        track.x = 0;
+        track.y = 1 - (track.i-track.max/4*3) / (track.max/4);
+    }
+
+    updatePointerMoveDataDirect(track.pointer, track.x, track.y);
+}
+
+function updatePointerMoveDataDirect (pointer, posXPer, posYPer) {
+    pointer.prevTexcoordX = pointer.texcoordX;
+    pointer.prevTexcoordY = pointer.texcoordY;
+    pointer.texcoordX = posXPer;
+    pointer.texcoordY = 1.0 - posYPer;
+    pointer.deltaX = correctDeltaX(pointer.texcoordX - pointer.prevTexcoordX);
+    pointer.deltaY = correctDeltaY(pointer.texcoordY - pointer.prevTexcoordY);
+    pointer.moved = Math.abs(pointer.deltaX) > 0 || Math.abs(pointer.deltaY) > 0;
+}
+function track(){
+    this.pointer = new pointerPrototype();
+    this.x = 0;
+    this.y = 0;
+    this.max = 10000;
+    this.i = this.max/2;
+    this.offset = 0;
+    this.start = null;
+}
+setTimeout(()=>{
+    let track1 = new track();
+    let track2 = new track();
+    track2.offset = track2.max/2;
+
+    //console.log(JSON.stringify(track2));
+    setInterval(()=>{
+        myfunc1(track1);
+        myfunc1(track2);
+        //console.log(JSON.stringify(track2));
+    }, 30);
+}, 2000);
 
 var timer = setInterval(randomSplat, 3500);
 var _runRandom = true;
@@ -77,9 +137,8 @@ document.addEventListener("visibilitychange", function() {
 
 let timeout;
 let timeoutBool=true;
-let lastBass = 0;
 function livelyAudioListener(audioArray)  {
-    if (audioArray[0] === 0 || _isSleep == true)
+    if (audioArray[0] > 5 || _isSleep == true)
     {
         _runRandom = true;
         return;
@@ -89,7 +148,7 @@ function livelyAudioListener(audioArray)  {
         return;
     }
 
-    if(audioArray[0]>=0.001 && _runRandom){
+    if(audioArray[0]>0.1 && _runRandom){
         _runRandom = false;
         clearTimeout(timeout);
         timeoutBool=true;
@@ -102,14 +161,14 @@ function livelyAudioListener(audioArray)  {
     }
 
     let bass = 0.0;
+    let half = Math.floor(audioArray.length / 2);
 
-    for (let i = 0; i <= config.FREQ_RANGE; i++) 
-      bass += audioArray[i]*2;
-      
-    bass /= (config.FREQ_RANGE * 2) * config.FREQ_MULTI;
-    
-    multipleSplats(Math.floor((bass * config.SOUND_SENSITIVITY) * 10)-lastBass);
-    lastBass = (bass,Math.floor((bass * config.SOUND_SENSITIVITY) * 10 ));
+    for (let i = 0; i <= config.FREQ_RANGE; i++) {
+        bass += audioArray[i];
+        bass += audioArray[half + i];
+    }
+    bass /= (config.FREQ_RANGE * 2);
+    multipleSplats(Math.floor((bass * config.SOUND_SENSITIVITY) * 10));
 }
 
 function multipleSplats (amount) {
@@ -134,10 +193,10 @@ function generateColor () {
     return c;
 }
 
-let _randomSplats = false;
-let _audioReact = false;
-let _bgImageChk = false;
-let _bgImagePath = "";
+var _randomSplats = false;
+var _audioReact = false;
+var _bgImageChk = false;
+var _bgImagePath = "";
 function livelyPropertyListener(name, val)
 {
 	switch(name) {
@@ -245,7 +304,7 @@ function livelyPropertyListener(name, val)
 }
 
 function hexToRgb(hex) {
-  let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result ? {
     r: parseInt(result[1], 16),
     g: parseInt(result[2], 16),
@@ -1555,63 +1614,6 @@ function checkLastMove(){
   }
   return false;
 }
-
-canvas.addEventListener('mousemove', e => {
-
-    if(checkLastMove()){
-      let posX = scaleByPixelRatio(e.offsetX);
-      let posY = scaleByPixelRatio(e.offsetY);
-      let pointer = pointers.find(p => p.id == -1);
-      if (pointer == null)
-          pointer = new pointerPrototype();
-      updatePointerDownData(pointer, -1, posX, posY);
-    }
-
-    let pointer = pointers[0];
-    if (!pointer.down) return;
-    let posX = scaleByPixelRatio(e.offsetX);
-    let posY = scaleByPixelRatio(e.offsetY);
-    updatePointerMoveData(pointer, posX, posY);
-});
-
-window.addEventListener('mouseup', () => {
-    updatePointerUpData(pointers[0]);
-});
-
-canvas.addEventListener('touchstart', e => {
-    e.preventDefault();
-    const touches = e.targetTouches;
-    while (touches.length >= pointers.length)
-        pointers.push(new pointerPrototype());
-    for (let i = 0; i < touches.length; i++) {
-        let posX = scaleByPixelRatio(touches[i].pageX);
-        let posY = scaleByPixelRatio(touches[i].pageY);
-        updatePointerDownData(pointers[i + 1], touches[i].identifier, posX, posY);
-    }
-});
-
-canvas.addEventListener('touchmove', e => {
-    e.preventDefault();
-    const touches = e.targetTouches;
-    for (let i = 0; i < touches.length; i++) {
-        let pointer = pointers[i + 1];
-        if (!pointer.down) continue;
-        let posX = scaleByPixelRatio(touches[i].pageX);
-        let posY = scaleByPixelRatio(touches[i].pageY);
-        updatePointerMoveData(pointer, posX, posY);
-    }
-}, false);
-
-window.addEventListener('touchend', e => {
-    const touches = e.changedTouches;
-    for (let i = 0; i < touches.length; i++)
-    {
-        let pointer = pointers.find(p => p.id == touches[i].identifier);
-        if (pointer == null) continue;
-        updatePointerUpData(pointer);
-    }
-});
-
 window.addEventListener('keydown', e => {
     if (e.code === 'KeyP')
         config.PAUSED = !config.PAUSED;
@@ -1637,43 +1639,6 @@ function updatePointerMoveData (pointer, posX, posY) {
     pointer.prevTexcoordY = pointer.texcoordY;
     pointer.texcoordX = posX / canvas.width;
     pointer.texcoordY = 1.0 - posY / canvas.height;
-    pointer.deltaX = correctDeltaX(pointer.texcoordX - pointer.prevTexcoordX);
-    pointer.deltaY = correctDeltaY(pointer.texcoordY - pointer.prevTexcoordY);
-    pointer.moved = Math.abs(pointer.deltaX) > 0 || Math.abs(pointer.deltaY) > 0;
-}
-
-var x = 0;
-var y = 0;
-var i = 0;
-var max = 1000000
-setInterval(myfunc1, 30);
-
-function myfunc1(){
-    i++;
-    if(i > max) i = 0;
-    
-    //track along 0-1 x then 0-1 y then reverse each.
-    if(i < max/4){
-	y = 0;
-        x = i / (max/4);
-    }else if(i < max/2){
-        x = 1;
-	y = (i-max/4) / (max/4);   
-    }else if(i < max/4*3){
-        y = 1;
-	x = 1 - (i-max/2) / (max/4);
-    }else{
-	x = 0;
-        y = 1 - (i-max/4*3) / (max/4);
-    }
-
-    updatePointerMoveData(pointers[0], x, y);
-}
-function updatePointerMoveDataFake (pointer, posXPer, posYPer) {
-    pointer.prevTexcoordX = pointer.texcoordX;
-    pointer.prevTexcoordY = pointer.texcoordY;
-    pointer.texcoordX = posXPer;
-    pointer.texcoordY = 1.0 - posYPer;
     pointer.deltaX = correctDeltaX(pointer.texcoordX - pointer.prevTexcoordX);
     pointer.deltaY = correctDeltaY(pointer.texcoordY - pointer.prevTexcoordY);
     pointer.moved = Math.abs(pointer.deltaX) > 0 || Math.abs(pointer.deltaY) > 0;
